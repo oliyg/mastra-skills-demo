@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>你好</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=ZCOOL+QingKe+HuangYou&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #e74c3c;
+            --accent-color: #3498db;
+            --bg-color: #f9f7f1;
+            --text-color: #2c3e50;
+            --shadow-color: rgba(44, 62, 80, 0.1);
+            --gradient-start: #f9f7f1;
+            --gradient-end: #e8e6df;
+        }
+
+        body {
+            font-family: 'Noto Serif SC', serif;
+            background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            padding: 2rem;
+        }
+
+        /* 背景纹理 */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 25% 25%, rgba(231, 76, 60, 0.03) 2px, transparent 2px),
+                radial-gradient(circle at 75% 75%, rgba(52, 152, 219, 0.03) 2px, transparent 2px);
+            background-size: 60px 60px;
+            opacity: 0.6;
+            z-index: -1;
+            animation: float 20s ease-in-out infinite alternate;
+        }
+
+        /* 装饰性元素 */
+        .decoration {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .circle {
+            position: absolute;
+            border-radius: 50%;
+            background: linear-gradient(45deg, var(--accent-color), var(--secondary-color));
+            opacity: 0.1;
+            animation: pulse 8s ease-in-out infinite;
+        }
+
+        .circle:nth-child(1) {
+            width: 300px;
+            height: 300px;
+            top: -150px;
+            left: -150px;
+            animation-delay: 0s;
+        }
+
+        .circle:nth-child(2) {
+            width: 200px;
+            height: 200px;
+            bottom: -100px;
+            right: -100px;
+            animation-delay: 2s;
+        }
+
+        .circle:nth-child(3) {
+            width: 150px;
+            height: 150px;
+            top: 50%;
+            left: 10%;
+            animation-delay: 4s;
+        }
+
+        /* 主要内容容器 */
+        .container {
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            max-width: 800px;
+            padding: 3rem;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            box-shadow: 
+                0 20px 60px var(--shadow-color),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transform-style: preserve-3d;
+            perspective: 1000px;
+        }
+
+        /* 汉字容器 */
+        .chinese-characters {
+            position: relative;
+            margin-bottom: 3rem;
+        }
+
+        /* 汉字样式 */
+        .character {
+            font-family: 'ZCOOL QingKe HuangYou', cursive;
+            font-size: 12rem;
+            line-height: 1;
+            color: var(--primary-color);
+            text-shadow: 
+                3px 3px 0 var(--accent-color),
+                6px 6px 0 rgba(52, 152, 219, 0.2),
+                9px 9px 0 rgba(52, 152, 219, 0.1);
+            position: relative;
+            display: inline-block;
+            margin: 0 0.5rem;
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+
+        .character:hover {
+            transform: translateY(-5px) rotateX(5deg);
+            text-shadow: 
+                5px 5px 0 var(--secondary-color),
+                10px 10px 0 rgba(231, 76, 60, 0.2),
+                15px 15px 0 rgba(231, 76, 60, 0.1);
+        }
+
+        /* 汉字笔画装饰 */
+        .stroke-decoration {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        .stroke {
+            position: absolute;
+            background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+            height: 3px;
+            border-radius: 3px;
+            opacity: 0;
+            animation: drawStroke 2s ease-out forwards;
+        }
+
+        .stroke:nth-child(1) {
+            top: 30%;
+            left: 10%;
+            width: 80%;
+            animation-delay: 0.5s;
+        }
+
+        .stroke:nth-child(2) {
+            top: 60%;
+            left: 20%;
+            width: 60%;
+            animation-delay: 1s;
+        }
+
+        /* 副标题 */
+        .subtitle {
+            font-size: 1.5rem;
+            color: var(--secondary-color);
+            margin-top: 2rem;
+            font-weight: 400;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            opacity: 0;
+            animation: fadeInUp 1s ease-out 1.5s forwards;
+            position: relative;
+            display: inline-block;
+        }
+
+        .subtitle::before,
+        .subtitle::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 40px;
+            height: 1px;
+            background: var(--secondary-color);
+            opacity: 0.5;
+        }
+
+        .subtitle::before {
+            right: calc(100% + 20px);
+        }
+
+        .subtitle::after {
+            left: calc(100% + 20px);
+        }
+
+        /* 交互提示 */
+        .interaction-hint {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9rem;
+            color: var(--text-color);
+            opacity: 0.6;
+            text-align: center;
+            animation: fadeIn 2s ease-out 2s forwards;
+            opacity: 0;
+        }
+
+        .interaction-hint span {
+            display: inline-block;
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        /* 动画定义 */
+        @keyframes float {
+            0%, 100% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+            33% {
+                transform: translate(20px, -20px) rotate(120deg);
+            }
+            66% {
+                transform: translate(-20px, 20px) rotate(240deg);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 0.1;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: 0.15;
+            }
+        }
+
+        @keyframes drawStroke {
+            0% {
+                width: 0;
+                opacity: 0;
+            }
+            50% {
+                opacity: 0.5;
+            }
+            100% {
+                width: var(--stroke-width, 80%);
+                opacity: 0.2;
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 0.6;
+            }
+        }
+
+        @keyframes bounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-5px);
+            }
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .character {
+                font-size: 8rem;
+            }
+            
+            .container {
+                padding: 2rem;
+                margin: 1rem;
+            }
+            
+            .subtitle {
+                font-size: 1.2rem;
+                letter-spacing: 0.2em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .character {
+                font-size: 6rem;
+                margin: 0 0.2rem;
+            }
+            
+            .container {
+                padding: 1.5rem;
+            }
+            
+            .subtitle {
+                font-size: 1rem;
+                letter-spacing: 0.1em;
+            }
+            
+            .subtitle::before,
+            .subtitle::after {
+                width: 20px;
+            }
+        }
+
+        /* 暗色模式支持 */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --primary-color: #ecf0f1;
+                --secondary-color: #e74c3c;
+                --accent-color: #3498db;
+                --bg-color: #1a1a2e;
+                --text-color: #ecf0f1;
+                --shadow-color: rgba(0, 0, 0, 0.3);
+                --gradient-start: #1a1a2e;
+                --gradient-end: #16213e;
+            }
+            
+            body::before {
+                background-image: 
+                    radial-gradient(circle at 25% 25%, rgba(231, 76, 60, 0.05) 2px, transparent 2px),
+                    radial-gradient(circle at 75% 75%, rgba(52, 152, 219, 0.05) 2px, transparent 2px);
+            }
+            
+            .container {
+                background: rgba(30, 30, 46, 0.9);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+        }
+
+        /* 打印样式 */
+        @media print {
+            .decoration,
+            .interaction-hint {
+                display: none;
+            }
+            
+            .container {
+                box-shadow: none;
+                background: white;
+            }
+            
+            .character {
+                text-shadow: none;
+                color: black;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 装饰性背景元素 -->
+    <div class="decoration">
+        <div class="circle"></div>
+        <div class="circle"></div>
+        <div class="circle"></div>
+    </div>
+
+    <!-- 主要内容 -->
+    <div class="container">
+        <div class="chinese-characters">
+            <div class="character" id="ni">你</div>
+            <div class="character" id="hao">好</div>
+            <div class="stroke-decoration">
+                <div class="stroke"></div>
+                <div class="stroke"></div>
+            </div>
+        </div>
+        
+        <div class="subtitle">A Simple Greeting</div>
+    </div>
+
+    <!-- 交互提示 -->
+    <div class="interaction-hint">
+        悬停汉字查看效果 <span>↑</span>
+    </div>
+
+    <script>
+        // 页面加载动画
+        document.addEventListener('DOMContentLoaded', function() {
+            // 延迟显示汉字
+            setTimeout(() => {
+                document.getElementById('ni').style.opacity = '1';
+                document.getElementById('ni').style.transform = 'translateY(0)';
+            }, 300);
+            
+            setTimeout(() => {
+                document.getElementById('hao').style.opacity = '1';
+                document.getElementById('hao').style.transform = 'translateY(0)';
+            }, 600);
+            
+            // 为汉字添加初始样式
+            const characters = document.querySelectorAll('.character');
+            characters.forEach(char => {
+                char.style.opacity = '0';
+                char.style.transform = 'translateY(20px)';
+                char.style.transition = 'opacity 0.8s ease, transform 0.8s ease';
+            });
+            
+            // 添加点击效果
+            characters.forEach(char => {
+                char.addEventListener('click', function() {
+                    this.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        this.style.transform = '';
+                    }, 200);
+                    
+                    // 创建涟漪效果
+                    const ripple = document.createElement('div');
+                    ripple.style.position = 'absolute';
+                    ripple.style.width = '100%';
+                    ripple.style.height = '100%';
+                    ripple.style.top = '0';
+                    ripple.style.left = '0';
+                    ripple.style.borderRadius = '50%';
+                    ripple.style.background = 'radial-gradient(circle, rgba(52, 152, 219, 0.3) 0%, transparent 70%)';
+                    ripple.style.animation = 'ripple 0.6s ease-out forwards';
+                    this.appendChild(ripple);
+                    
+                    setTimeout(() => {
+                        ripple.remove();
+                    }, 600);
+                });
+            });
+            
+            // 添加键盘交互
+            document.addEventListener('keydown', function(e) {
+                if (e.key === ' ') {
+                    document.body.classList.toggle('dark-mode');
+                }
+            });
+            
+            // 添加鼠标移动效果
+            document.addEventListener('mousemove', function(e) {
+                const x = (e.clientX / window.innerWidth - 0.5) * 20;
+                const y = (e.clientY / window.innerHeight - 0.5) * 20;
+                
+                document.querySelector('.container').style.transform = 
+                    `perspective(1000px) rotateY(${x}deg) rotateX(${-y}deg)`;
+            });
+            
+            // 添加CSS动画
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes ripple {
+                    0% {
+                        transform: scale(0);
+                        opacity: 1;
+                    }
+                    100% {
+                        transform: scale(2);
+                        opacity: 0;
+                    }
+                }
+                
+                .dark-mode {
+                    filter: invert(1) hue-rotate(180deg);
+                }
+            `;
+            document.head.appendChild(style);
+        });
+        
+        // 响应窗口大小变化
+        window.addEventListener('resize', function() {
+            document.querySelector('.container').style.transform = '';
+        });
+    </script>
+</body>
+</html>

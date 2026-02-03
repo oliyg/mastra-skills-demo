@@ -1,0 +1,35 @@
+{
+  "name": "api",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "mastra dev",
+    "build": "mastra build",
+    "start": "mastra start"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "dependencies": {
+    "@ai-sdk/deepseek": "^2.0.17",
+    "@mastra/ai-sdk": "^1.0.3",
+    "@mastra/core": "^1.1.0",
+    "@mastra/evals": "^1.0.1",
+    "@mastra/libsql": "^1.1.0",
+    "@mastra/loggers": "^1.0.1",
+    "@mastra/memory": "^1.0.1",
+    "@mastra/observability": "^1.1.0",
+    "zod": "^3.25.75"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.0",
+    "mastra": "^1.1.0",
+    "typescript": "^5.9.3"
+  }
+}
