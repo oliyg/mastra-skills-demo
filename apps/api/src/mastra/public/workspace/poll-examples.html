@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文件轮询示例 - File Polling Examples</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 { color: #333; }
+    h2 { color: #555; margin-top: 30px; }
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .card h3 {
+      margin-top: 0;
+      color: #0066cc;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status.connected { background: #d4edda; color: #155724; }
+    .status.disconnected { background: #f8d7da; color: #721c24; }
+    .status.connecting { background: #fff3cd; color: #856404; }
+    .file-list {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      margin-top: 10px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    .file-item {
+      padding: 4px 8px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .file-item:hover { background: #f0f0f0; }
+    .file-item.selected { background: #e3f2fd; }
+    .file-item .icon { margin-right: 6px; }
+    .file-item .icon.file { color: #666; }
+    .file-item .icon.dir { color: #2196F3; }
+    .editor {
+      width: 100%;
+      height: 300px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 13px;
+      resize: vertical;
+      margin-top: 10px;
+    }
+    .btn {
+      background: #0066cc;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 8px;
+      font-size: 14px;
+    }
+    .btn:hover { background: #0052a3; }
+    .btn:disabled { background: #ccc; cursor: not-allowed; }
+    .btn.secondary { background: #6c757d; }
+    .btn.secondary:hover { background: #545b62; }
+    .log {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 10px;
+    }
+    .log-entry { margin: 2px 0; }
+    .log-entry.info { color: #4fc1ff; }
+    .log-entry.success { color: #4ec9b0; }
+    .log-entry.error { color: #f48771; }
+    .log-entry.warn { color: #dcdcaa; }
+    .path-input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      font-family: monospace;
+    }
+    .stats {
+      display: flex;
+      gap: 20px;
+      font-size: 12px;
+      color: #666;
+      margin-top: 10px;
+    }
+    .stats span { display: flex; align-items: center; gap: 4px; }
+    @media (max-width: 900px) {
+      .container { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <h1>🔄 文件轮询示例 (File Polling Examples)</h1>
+  <p>展示如何在聊天时实时同步文件列表和内容变化。推荐使用 <strong>SSE</strong> 方案。</p>
+
+  <div class="container">
+    <!-- 方案1: 短轮询 + ETag -->
+    <div class="card">
+      <h3>📡 方案1: 短轮询 + ETag</h3>
+      <span id="poll-status" class="status disconnected">未连接</span>
+      <div style="margin-top: 10px;">
+        <input type="text" id="poll-path" class="path-input" value="/skills" placeholder="路径">
+        <div>
+          <button class="btn" onclick="startPolling()">开始轮询</button>
+          <button class="btn secondary" onclick="stopPolling()">停止</button>
+        </div>
+      </div>
+      <div class="stats">
+        <span>📁 文件数: <b id="poll-file-count">0</b></span>
+        <span>🔄 请求数: <b id="poll-request-count">0</b></span>
+        <span>💾 304缓存: <b id="poll-cache-hits">0</b></span>
+      </div>
+      <div id="poll-file-list" class="file-list">
+        <div style="color: #999;">点击"开始轮询"加载文件列表...</div>
+      </div>
+      <div id="poll-log" class="log"></div>
+    </div>
+
+    <!-- 方案2: SSE 实时推送 (推荐) -->
+    <div class="card">
+      <h3>⚡ 方案2: SSE 实时推送（推荐）</h3>
+      <span id="sse-status" class="status disconnected">未连接</span>
+      <div style="margin-top: 10px;">
+        <input type="text" id="sse-path" class="path-input" value="/skills" placeholder="路径">
+        <div>
+          <button class="btn" onclick="startSSE()">连接 SSE</button>
+          <button class="btn secondary" onclick="stopSSE()">断开</button>
+        </div>
+      </div>
+      <div class="stats">
+        <span>📁 文件数: <b id="sse-file-count">0</b></span>
+        <span>📨 消息数: <b id="sse-message-count">0</b></span>
+        <span>🔔 更新次数: <b id="sse-update-count">0</b></span>
+      </div>
+      <div id="sse-file-list" class="file-list">
+        <div style="color: #999;">点击"连接 SSE"加载文件列表...</div>
+      </div>
+      <div id="sse-log" class="log"></div>
+    </div>
+
+    <!-- 文件内容轮询 -->
+    <div class="card">
+      <h3>📝 文件内容轮询 (ETag)</h3>
+      <span id="content-poll-status" class="status disconnected">未连接</span>
+      <div style="margin-top: 10px;">
+        <input type="text" id="content-poll-path" class="path-input" value="/skills/frontend-design/SKILL.md" placeholder="文件路径">
+        <div>
+          <button class="btn" onclick="startContentPolling()">开始轮询</button>
+          <button class="btn secondary" onclick="stopContentPolling()">停止</button>
+        </div>
+      </div>
+      <div class="stats">
+        <span>📏 大小: <b id="content-poll-size">0</b> bytes</span>
+        <span>🔄 请求数: <b id="content-poll-requests">0</b></span>
+        <span>💾 缓存命中: <b id="content-poll-hits">0</b></span>
+      </div>
+      <textarea id="content-poll-editor" class="editor" readonly placeholder="选择文件后开始轮询...">选择文件后开始轮询...</textarea>
+      <div id="content-poll-log" class="log"></div>
+    </div>
+
+    <!-- 文件内容 SSE -->
+    <div class="card">
+      <h3>⚡ 文件内容 SSE（推荐）</h3>
+      <span id="content-sse-status" class="status disconnected">未连接</span>
+      <div style="margin-top: 10px;">
+        <input type="text" id="content-sse-path" class="path-input" value="/skills/frontend-design/SKILL.md" placeholder="文件路径">
+        <div>
+          <button class="btn" onclick="startContentSSE()">连接 SSE</button>
+          <button class="btn secondary" onclick="stopContentSSE()">断开</button>
+        </div>
+      </div>
+      <div class="stats">
+        <span>📏 大小: <b id="content-sse-size">0</b> bytes</span>
+        <span>📨 消息数: <b id="content-sse-messages">0</b></span>
+        <span>🔔 更新次数: <b id="content-sse-updates">0</b></span>
+      </div>
+      <textarea id="content-sse-editor" class="editor" readonly placeholder="选择文件后连接 SSE...">选择文件后连接 SSE...</textarea>
+      <div id="content-sse-log" class="log"></div>
+    </div>
+  </div>
+
+  <script>
+    // ==================== 日志工具 ====================
+    function log(elementId, message, type = 'info') {
+      const logEl = document.getElementById(elementId);
+      const time = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${time}] ${message}`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+      
+      // 限制日志行数
+      while (logEl.children.length > 50) {
+        logEl.removeChild(logEl.firstChild);
+      }
+    }
+
+    // ==================== 方案1: 短轮询 + ETag ====================
+    let pollTimer = null;
+    let pollETag = null;
+    let pollRequestCount = 0;
+    let pollCacheHits = 0;
+
+    async function fetchWithETag(path) {
+      const url = `/poll/files?path=${encodeURIComponent(path)}&recursive=false`;
+      const headers = pollETag ? { 'If-None-Match': pollETag } : {};
+      
+      const res = await fetch(url, { headers });
+      pollRequestCount++;
+      document.getElementById('poll-request-count').textContent = pollRequestCount;
+
+      if (res.status === 304) {
+        pollCacheHits++;
+        document.getElementById('poll-cache-hits').textContent = pollCacheHits;
+        log('poll-log', `304 Not Modified (ETag: ${pollETag})`, 'info');
+        return null;
+      }
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      pollETag = res.headers.get('ETag');
+      return res.json();
+    }
+
+    async function startPolling() {
+      if (pollTimer) return;
+      
+      const path = document.getElementById('poll-path').value || '/';
+      document.getElementById('poll-status').className = 'status connected';
+      document.getElementById('poll-status').textContent = '轮询中 (3s)';
+      
+      log('poll-log', `开始轮询: ${path}`, 'success');
+
+      // 首次立即执行
+      await pollOnce(path);
+
+      // 每3秒轮询一次
+      pollTimer = setInterval(() => pollOnce(path), 3000);
+    }
+
+    async function pollOnce(path) {
+      try {
+        const data = await fetchWithETag(path);
+        if (data) {
+          updatePollFileList(data.files);
+          log('poll-log', `更新文件列表: ${data.files.length} 个文件`, 'success');
+        }
+      } catch (err) {
+        log('poll-log', `错误: ${err.message}`, 'error');
+      }
+    }
+
+    function updatePollFileList(files) {
+      const container = document.getElementById('poll-file-list');
+      document.getElementById('poll-file-count').textContent = files.length;
+      
+      if (files.length === 0) {
+        container.innerHTML = '<div style="color: #999;">空目录</div>';
+        return;
+      }
+
+      container.innerHTML = files.map(f => `
+        <div class="file-item" onclick="selectFile('${f.name}', '${f.type}')">
+          <span class="icon ${f.type}">${f.type === 'directory' ? '📁' : '📄'}</span>
+          ${f.name}
+          ${f.size ? `<span style="color: #999; float: right;">${formatSize(f.size)}</span>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function stopPolling() {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      document.getElementById('poll-status').className = 'status disconnected';
+      document.getElementById('poll-status').textContent = '已停止';
+      log('poll-log', '停止轮询', 'warn');
+    }
+
+    // ==================== 方案2: SSE 实时推送 ====================
+    let sseConnection = null;
+    let sseMessageCount = 0;
+    let sseUpdateCount = 0;
+
+    function startSSE() {
+      if (sseConnection) return;
+
+      const path = document.getElementById('sse-path').value || '/';
+      const url = `/sse/files?path=${encodeURIComponent(path)}&recursive=false`;
+      
+      document.getElementById('sse-status').className = 'status connecting';
+      document.getElementById('sse-status').textContent = '连接中...';
+      log('sse-log', `连接 SSE: ${url}`, 'info');
+
+      sseConnection = new EventSource(url);
+
+      sseConnection.onopen = () => {
+        document.getElementById('sse-status').className = 'status connected';
+        document.getElementById('sse-status').textContent = '已连接';
+        log('sse-log', 'SSE 连接成功', 'success');
+      };
+
+      sseConnection.onmessage = (event) => {
+        sseMessageCount++;
+        document.getElementById('sse-message-count').textContent = sseMessageCount;
+
+        try {
+          const data = JSON.parse(event.data);
+          log('sse-log', `收到消息: ${data.type}`, 'info');
+
+          if (data.type === 'filelist:init') {
+            updateSSEFileList(data.data);
+          } else if (data.type === 'filelist:changed') {
+            sseUpdateCount++;
+            document.getElementById('sse-update-count').textContent = sseUpdateCount;
+            updateSSEFileList(data.data);
+            log('sse-log', `🔄 文件列表已更新! (${data.data.length} 个文件)`, 'success');
+          }
+        } catch (err) {
+          log('sse-log', `解析错误: ${err.message}`, 'error');
+        }
+      };
+
+      sseConnection.onerror = () => {
+        document.getElementById('sse-status').className = 'status disconnected';
+        document.getElementById('sse-status').textContent = '连接错误';
+        log('sse-log', 'SSE 连接错误', 'error');
+      };
+    }
+
+    function updateSSEFileList(files) {
+      const container = document.getElementById('sse-file-list');
+      document.getElementById('sse-file-count').textContent = files.length;
+      
+      if (files.length === 0) {
+        container.innerHTML = '<div style="color: #999;">空目录</div>';
+        return;
+      }
+
+      container.innerHTML = files.map(f => `
+        <div class="file-item" onclick="selectFile('${f.name}', '${f.type}')">
+          <span class="icon ${f.type}">${f.type === 'directory' ? '📁' : '📄'}</span>
+          ${f.name}
+          ${f.size ? `<span style="color: #999; float: right;">${formatSize(f.size)}</span>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function stopSSE() {
+      if (sseConnection) {
+        sseConnection.close();
+        sseConnection = null;
+      }
+      document.getElementById('sse-status').className = 'status disconnected';
+      document.getElementById('sse-status').textContent = '已断开';
+      log('sse-log', 'SSE 连接已关闭', 'warn');
+    }
+
+    // ==================== 文件内容轮询 ====================
+    let contentPollTimer = null;
+    let contentPollETag = null;
+    let contentPollRequests = 0;
+    let contentPollHits = 0;
+
+    async function startContentPolling() {
+      if (contentPollTimer) return;
+
+      const path = document.getElementById('content-poll-path').value;
+      if (!path) {
+        alert('请输入文件路径');
+        return;
+      }
+
+      document.getElementById('content-poll-status').className = 'status connected';
+      document.getElementById('content-poll-status').textContent = '轮询中 (2s)';
+      log('content-poll-log', `开始轮询文件: ${path}`, 'success');
+
+      await pollContentOnce(path);
+      contentPollTimer = setInterval(() => pollContentOnce(path), 2000);
+    }
+
+    async function pollContentOnce(path) {
+      try {
+        const url = `/poll/file/content?path=${encodeURIComponent(path)}`;
+        const headers = contentPollETag ? { 'If-None-Match': contentPollETag } : {};
+        
+        const res = await fetch(url, { headers });
+        contentPollRequests++;
+        document.getElementById('content-poll-requests').textContent = contentPollRequests;
+
+        if (res.status === 304) {
+          contentPollHits++;
+          document.getElementById('content-poll-hits').textContent = contentPollHits;
+          log('content-poll-log', '304 Not Modified', 'info');
+          return;
+        }
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        contentPollETag = data.etag;
+        
+        document.getElementById('content-poll-editor').value = data.content;
+        document.getElementById('content-poll-size').textContent = data.content.length;
+        log('content-poll-log', `内容已更新 (${data.content.length} bytes)`, 'success');
+      } catch (err) {
+        log('content-poll-log', `错误: ${err.message}`, 'error');
+      }
+    }
+
+    function stopContentPolling() {
+      if (contentPollTimer) {
+        clearInterval(contentPollTimer);
+        contentPollTimer = null;
+      }
+      document.getElementById('content-poll-status').className = 'status disconnected';
+      document.getElementById('content-poll-status').textContent = '已停止';
+      log('content-poll-log', '停止轮询', 'warn');
+    }
+
+    // ==================== 文件内容 SSE ====================
+    let contentSSEConnection = null;
+    let contentSseMessages = 0;
+    let contentSseUpdates = 0;
+
+    function startContentSSE() {
+      if (contentSSEConnection) return;
+
+      const path = document.getElementById('content-sse-path').value;
+      if (!path) {
+        alert('请输入文件路径');
+        return;
+      }
+
+      const url = `/sse/file/content?path=${encodeURIComponent(path)}`;
+      document.getElementById('content-sse-status').className = 'status connecting';
+      document.getElementById('content-sse-status').textContent = '连接中...';
+      log('content-sse-log', `连接内容 SSE: ${url}`, 'info');
+
+      contentSSEConnection = new EventSource(url);
+
+      contentSSEConnection.onopen = () => {
+        document.getElementById('content-sse-status').className = 'status connected';
+        document.getElementById('content-sse-status').textContent = '已连接';
+        log('content-sse-log', '内容 SSE 连接成功', 'success');
+      };
+
+      contentSSEConnection.onmessage = (event) => {
+        contentSseMessages++;
+        document.getElementById('content-sse-messages').textContent = contentSseMessages;
+
+        try {
+          const data = JSON.parse(event.data);
+          
+          if (data.type === 'file:init') {
+            document.getElementById('content-sse-editor').value = data.content;
+            document.getElementById('content-sse-size').textContent = data.content.length;
+            log('content-sse-log', `初始化内容 (${data.content.length} bytes)`, 'info');
+          } else if (data.type === 'file:changed') {
+            contentSseUpdates++;
+            document.getElementById('content-sse-updates').textContent = contentSseUpdates;
+            document.getElementById('content-sse-editor').value = data.content;
+            document.getElementById('content-sse-size').textContent = data.content.length;
+            log('content-sse-log', '🔄 文件内容已更新!', 'success');
+            
+            // 可以在这里显示提示，询问用户是否应用更新
+            // if (confirm('文件已被修改，是否重新加载？')) {
+            //   document.getElementById('content-sse-editor').value = data.content;
+            // }
+          }
+        } catch (err) {
+          log('content-sse-log', `解析错误: ${err.message}`, 'error');
+        }
+      };
+
+      contentSSEConnection.onerror = () => {
+        document.getElementById('content-sse-status').className = 'status disconnected';
+        document.getElementById('content-sse-status').textContent = '连接错误';
+        log('content-sse-log', '内容 SSE 连接错误', 'error');
+      };
+    }
+
+    function stopContentSSE() {
+      if (contentSSEConnection) {
+        contentSSEConnection.close();
+        contentSSEConnection = null;
+      }
+      document.getElementById('content-sse-status').className = 'status disconnected';
+      document.getElementById('content-sse-status').textContent = '已断开';
+      log('content-sse-log', '内容 SSE 已关闭', 'warn');
+    }
+
+    // ==================== 工具函数 ====================
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function selectFile(name, type) {
+      // 可以在这里处理文件选择逻辑
+      console.log('Selected:', name, type);
+    }
+
+    // 页面卸载时清理连接
+    window.addEventListener('beforeunload', () => {
+      stopPolling();
+      stopSSE();
+      stopContentPolling();
+      stopContentSSE();
+    });
+  </script>
+</body>
+</html>
