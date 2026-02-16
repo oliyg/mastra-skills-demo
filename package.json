@@ -1,0 +1,47 @@
+{
+  "name": "skills-mastra-workflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Turborepo project with Vue 3 frontend and Mastra backend",
+  "packageManager": "npm@10.9.2",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "format": "prettier --write \"**/*.{ts,tsx,vue,css,json}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,vue,css,json}\"",
+    "prepare": "husky",
+    "lint-staged": "lint-staged"
+  },
+  "keywords": [
+    "turborepo",
+    "vue3",
+    "mastra",
+    "ai"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@changesets/cli": "^2.27.1",
+    "husky": "^9.1.0",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.2.0",
+    "turbo": "^2.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,vue,css,json}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx,vue}": [
+      "eslint --fix"
+    ]
+  }
+}

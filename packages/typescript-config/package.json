@@ -1,0 +1,11 @@
+{
+  "name": "@skills-mastra-workflow/typescript-config",
+  "version": "0.0.0",
+  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "*.json"
+  ]
+}

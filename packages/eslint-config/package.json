@@ -1,0 +1,15 @@
+{
+  "name": "@skills-mastra-workflow/eslint-config",
+  "version": "0.0.0",
+  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "eslint-plugin-vue": "^9.32.0",
+    "globals": "^15.14.0",
+    "typescript-eslint": "^8.18.2"
+  }
+}
