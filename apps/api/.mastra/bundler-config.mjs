@@ -9,13 +9,6 @@ import { Memory } from '@mastra/memory';
 import { Workflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 
-const greeterAgent = new Agent({
-  id: "greeter-agent",
-  name: "Greeter",
-  instructions: "You are a friendly greeter agent. Your job is to greet users warmly and respond to their greetings in a helpful manner.",
-  model: deepseek("deepseek-chat")
-});
-
 const SYSTEM_PROMPT = `You are an expert frontend code generator. Your task is to create complete, standalone HTML files based on user requirements.
 
 ## Core Constraints (CRITICAL - MUST FOLLOW)
@@ -201,7 +194,12 @@ function createWorkspaceAgent(workspace) {
     name: "Workspace Agent",
     instructions: WORKSPACE_AGENT_PROMPT,
     model: deepseek("deepseek-chat"),
-    workspace: agentWorkspace
+    workspace: agentWorkspace,
+    memory: new Memory({
+      options: {
+        lastMessages: 20
+      }
+    })
   });
 }
 createWorkspaceAgent();
@@ -294,7 +292,6 @@ const frontendCodeGeneratorAgent = createFrontendCodeGeneratorAgent(readOnlyWork
 const workspaceAgent = createWorkspaceAgent(globalWorkspace);
 const mastra = new Mastra({
   agents: {
-    greeter: greeterAgent,
     frontendCodeGenerator: frontendCodeGeneratorAgent,
     workspace: workspaceAgent
   },

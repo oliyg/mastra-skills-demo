@@ -10,14 +10,6 @@ import { LibSQLStore } from '@mastra/libsql';
 import { Observability, SensitiveDataFilter, DefaultExporter, CloudExporter } from '@mastra/observability';
 
 "use strict";
-const greeterAgent = new Agent({
-  id: "greeter-agent",
-  name: "Greeter",
-  instructions: "You are a friendly greeter agent. Your job is to greet users warmly and respond to their greetings in a helpful manner.",
-  model: deepseek("deepseek-chat")
-});
-
-"use strict";
 const SYSTEM_PROMPT = `You are an expert frontend code generator. Your task is to create complete, standalone HTML files based on user requirements.
 
 ## Core Constraints (CRITICAL - MUST FOLLOW)
@@ -249,7 +241,12 @@ function createWorkspaceAgent(workspace) {
     name: "Workspace Agent",
     instructions: WORKSPACE_AGENT_PROMPT,
     model: deepseek("deepseek-chat"),
-    workspace: agentWorkspace
+    workspace: agentWorkspace,
+    memory: new Memory({
+      options: {
+        lastMessages: 20
+      }
+    })
   });
 }
 const workspaceAgent$1 = createWorkspaceAgent();
@@ -350,7 +347,6 @@ const frontendCodeGeneratorAgent = createFrontendCodeGeneratorAgent(readOnlyWork
 const workspaceAgent = createWorkspaceAgent(globalWorkspace);
 const mastra = new Mastra({
   agents: {
-    greeter: greeterAgent,
     frontendCodeGenerator: frontendCodeGeneratorAgent,
     workspace: workspaceAgent
   },
@@ -387,4 +383,4 @@ const mastra = new Mastra({
   // 2.1 在 Mastra 配置中添加 workspace 选项
 });
 
-export { mastra as default, frontendCodeGeneratorAgent, greeterAgent, mastra, workspaceAgent };
+export { mastra as default, frontendCodeGeneratorAgent, mastra, workspaceAgent };

@@ -1,9 +1,5 @@
 import { Mastra } from '@mastra/core';
-import {
-  greeterAgent,
-  createFrontendCodeGeneratorAgent,
-  createWorkspaceAgent,
-} from './agents/index.js';
+import { createFrontendCodeGeneratorAgent, createWorkspaceAgent } from './agents/index.js';
 import { simpleWorkflow } from './workflows/index.js';
 import { PinoLogger } from '@mastra/loggers';
 import { LibSQLStore } from '@mastra/libsql';
@@ -29,6 +25,7 @@ const globalWorkspace = new Workspace({
     basePath: workspacePath,
     contained: true, // 1.5 确保工作空间只能访问其目录内的文件
   }),
+  // skills: ['./skills'], // 可根据需要添加全局技能
   sandbox: new LocalSandbox({
     workingDirectory: workspacePath,
   }),
@@ -42,6 +39,7 @@ const readOnlyWorkspace = new Workspace({
     basePath: workspacePath,
     contained: true,
   }),
+  // skills: ['./skills'], // 可根据需要添加全局技能
   tools: {
     // 禁用写入相关工具
     [WORKSPACE_TOOLS.FILESYSTEM.WRITE_FILE]: { enabled: false },
@@ -66,7 +64,6 @@ const workspaceAgent = createWorkspaceAgent(globalWorkspace);
 // 创建 Mastra 实例并配置 workspace
 const mastra = new Mastra({
   agents: {
-    greeter: greeterAgent,
     frontendCodeGenerator: frontendCodeGeneratorAgent,
     workspace: workspaceAgent,
   },
@@ -101,6 +98,6 @@ const mastra = new Mastra({
 // 2.2 确保工作空间在 Mastra 实例中可用
 // 工作空间已通过 Mastra 配置传递，可以通过 mastra.workspace 访问
 
-export { mastra, frontendCodeGeneratorAgent, greeterAgent, workspaceAgent };
+export { mastra, frontendCodeGeneratorAgent, workspaceAgent };
 
 export default mastra;

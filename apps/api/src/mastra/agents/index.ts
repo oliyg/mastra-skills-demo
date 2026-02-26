@@ -1,4 +1,3 @@
-export { greeterAgent } from './greeter.js';
 export {
   frontendCodeGeneratorAgent,
   createFrontendCodeGeneratorAgent,

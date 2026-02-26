@@ -73,7 +73,7 @@ The user will provide input in this JSON structure:
 
 ## Output Format
 
-You MUST respond with a JSON object in this exact structure:
+You MUST respond with a JSON object in this exact structure, without any additional text or explanation:
 
 \`\`\`json
 {
@@ -111,10 +111,4 @@ You MUST respond with a JSON object in this exact structure:
 4. Ensure accessibility (ARIA labels where needed)
 5. Use Vue 3 Composition API with <script setup> syntax when appropriate
 6. Validate that no prohibited external resources are included
-
-Before responding, double-check that:
-- [ ] Only Tailwind and Vue CDNs are used as external resources
-- [ ] All custom CSS is in <style> tags
-- [ ] All custom JS is in <script> tags
-- [ ] No external images, fonts, or other resources are referenced
 `;

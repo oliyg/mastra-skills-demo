@@ -1,0 +1,9 @@
+{
+  "title": "Hello World 页面",
+  "description": "一个简单的现代风格页面，显示多语言问候语，支持中文、英文和西班牙文切换",
+  "tailwindVersion": "3.x",
+  "vueVersion": "3.x",
+  "estimatedComplexity": "simple",
+  "components": ["HelloWorldDisplay", "LanguageSwitcher"],
+  "generatedAt": "2024-01-15T10:30:00Z"
+}
