@@ -1,9 +1,10 @@
 import { Mastra } from '@mastra/core';
 import { Agent } from '@mastra/core/agent';
-import { deepseek } from '@ai-sdk/deepseek';
 import { Memory } from '@mastra/memory';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { z } from 'zod';
 import { Workspace, WORKSPACE_TOOLS, LocalSandbox, LocalFilesystem } from '@mastra/core/workspace';
+import { deepseek } from '@ai-sdk/deepseek';
 import { createStep, Workflow } from '@mastra/core/workflows';
 import { PinoLogger } from '@mastra/loggers';
 import { LibSQLStore } from '@mastra/libsql';
@@ -80,7 +81,7 @@ The user will provide input in this JSON structure:
 
 ## Output Format
 
-You MUST respond with a JSON object in this exact structure:
+You MUST respond with a JSON object in this exact structure, without any additional text or explanation:
 
 \`\`\`json
 {
@@ -118,13 +119,19 @@ You MUST respond with a JSON object in this exact structure:
 4. Ensure accessibility (ARIA labels where needed)
 5. Use Vue 3 Composition API with <script setup> syntax when appropriate
 6. Validate that no prohibited external resources are included
-
-Before responding, double-check that:
-- [ ] Only Tailwind and Vue CDNs are used as external resources
-- [ ] All custom CSS is in <style> tags
-- [ ] All custom JS is in <script> tags
-- [ ] No external images, fonts, or other resources are referenced
 `;
+
+"use strict";
+let model;
+const getModel = (modelName = "qwen-flash") => {
+  if (model) return model;
+  model = createOpenAICompatible({
+    baseURL: process.env.MODEL_BASE_URL ?? "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    name: "openAICompatibleModel",
+    apiKey: process.env.MODEL_API_KEY ?? "NO_API_KEY_FOUND"
+  }).chatModel(process.env.modelName ?? modelName);
+  return model;
+};
 
 "use strict";
 const StyleOptionSchema = z.enum(["modern", "minimalist", "colorful"]).default("modern");
@@ -168,7 +175,7 @@ function createFrontendCodeGeneratorAgent(workspace) {
     id: "frontend-code-generator",
     name: "Frontend Code Generator",
     instructions: SYSTEM_PROMPT,
-    model: deepseek("deepseek-chat"),
+    model: getModel(),
     workspace,
     // 3.3 为只读代理应用工作空间配置
     memory: new Memory({
@@ -254,50 +261,104 @@ const workspaceAgent$1 = createWorkspaceAgent();
 "use strict";
 
 "use strict";
+const generateFrontendCodeSchema = z.object({
+  html: z.string(),
+  metadata: z.object({
+    title: z.string(),
+    description: z.string(),
+    tailwindVersion: z.string(),
+    vueVersion: z.string(),
+    estimatedComplexity: z.string(),
+    components: z.array(z.string()),
+    generatedAt: z.string()
+  })
+});
 const stepOne = createStep({
-  id: "step-one",
+  id: "receive-requirement",
   inputSchema: z.object({
-    input: z.string()
+    requirement: z.string().describe("User one-sentence requirement for frontend page")
   }),
   outputSchema: z.object({
-    result: z.string(),
-    timestamp: z.string()
+    requirement: z.string()
   }),
   execute: async ({ inputData }) => {
     return {
-      result: `Step 1 processed: ${inputData.input}`,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      requirement: inputData.requirement
     };
   }
 });
 const stepTwo = createStep({
-  id: "step-two",
+  id: "generate-frontend-code",
   inputSchema: z.object({
-    result: z.string(),
-    timestamp: z.string()
+    requirement: z.string()
   }),
+  outputSchema: generateFrontendCodeSchema,
+  execute: async ({ inputData, mastra }) => {
+    const agent = mastra.getAgent("frontendCodeGenerator");
+    if (!agent) {
+      throw new Error("Agent frontendCodeGenerator not found");
+    }
+    const prompt = JSON.stringify({
+      requirement: inputData.requirement,
+      options: {
+        style: "modern",
+        complexity: "simple"
+      }
+    });
+    const result = await agent.stream(prompt, {
+      structuredOutput: {
+        schema: generateFrontendCodeSchema
+      }
+    });
+    const res = await result.getFullOutput();
+    return res.object;
+  }
+});
+const stepThree = createStep({
+  id: "write-files",
+  inputSchema: generateFrontendCodeSchema,
   outputSchema: z.object({
-    finalResult: z.string(),
-    processed: z.boolean()
+    htmlPath: z.string(),
+    jsonPath: z.string(),
+    success: z.boolean()
   }),
-  execute: async ({ inputData }) => {
-    const stepOneResult = inputData.result || "No input";
+  execute: async ({ inputData, mastra }) => {
+    const title = inputData.metadata.title;
+    const safeTitle = title.toLowerCase().replace(/[^a-z0-9]/g, "-");
+    const htmlContent = inputData.html;
+    const metadataJson = JSON.stringify(inputData.metadata, null, 2);
+    const htmlFileName = `${safeTitle}.html`;
+    const jsonFileName = `${safeTitle}.json`;
+    const workspaceAgent = mastra.getAgent("workspace");
+    if (!workspaceAgent) {
+      throw new Error("Agent workspace not found");
+    }
+    const htmlPrompt = `Write the following content to file "${htmlFileName}":
+
+${htmlContent}`;
+    await workspaceAgent.stream(htmlPrompt);
+    const jsonPrompt = `Write the following content to file "${jsonFileName}":
+
+${metadataJson}`;
+    await workspaceAgent.stream(jsonPrompt);
     return {
-      finalResult: `Step 2 completed with: ${stepOneResult}`,
-      processed: true
+      htmlPath: htmlFileName,
+      jsonPath: jsonFileName,
+      success: true
     };
   }
 });
 const simpleWorkflow = new Workflow({
   id: "simple-workflow",
   inputSchema: z.object({
-    input: z.string().describe("Input text to process")
+    requirement: z.string().describe("User one-sentence requirement for frontend page")
   }),
   outputSchema: z.object({
-    finalResult: z.string(),
-    processed: z.boolean()
+    htmlPath: z.string(),
+    jsonPath: z.string(),
+    success: z.boolean()
   })
-}).then(stepOne).then(stepTwo);
+}).then(stepOne).then(stepTwo).then(stepThree);
 
 "use strict";
 
@@ -314,6 +375,7 @@ const globalWorkspace = new Workspace({
     contained: true
     // 1.5 确保工作空间只能访问其目录内的文件
   }),
+  // skills: ['./skills'], // 可根据需要添加全局技能
   sandbox: new LocalSandbox({
     workingDirectory: workspacePath
   })
@@ -325,6 +387,7 @@ const readOnlyWorkspace = new Workspace({
     basePath: workspacePath,
     contained: true
   }),
+  // skills: ['./skills'], // 可根据需要添加全局技能
   tools: {
     // 禁用写入相关工具
     [WORKSPACE_TOOLS.FILESYSTEM.WRITE_FILE]: {

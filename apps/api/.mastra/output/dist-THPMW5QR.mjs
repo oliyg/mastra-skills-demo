@@ -2,14 +2,14 @@ import { w as withoutTrailingSlash, N as NoSuchModelError, l as loadApiKey, p as
 import { z } from 'zod';
 import '@mastra/core/evals/scoreTraces';
 import '@mastra/core';
+import '@mastra/core/workspace';
 import '@mastra/loggers';
 import '@mastra/libsql';
 import '@mastra/observability';
-import '@mastra/core/workspace';
 import '@mastra/core/workflows';
 import '@mastra/core/agent';
-import '@ai-sdk/deepseek';
 import '@mastra/memory';
+import '@ai-sdk/openai-compatible';
 import 'fs/promises';
 import 'https';
 import 'path';

@@ -7,14 +7,14 @@ import { getThreadOMMetadata, parseMemoryRequestContext, setThreadOMMetadata } f
 import { MessageHistory } from '@mastra/core/processors';
 import '@mastra/core/evals/scoreTraces';
 import '@mastra/core';
+import '@mastra/core/workspace';
 import '@mastra/loggers';
 import '@mastra/libsql';
 import '@mastra/observability';
-import '@mastra/core/workspace';
 import '@mastra/core/workflows';
 import 'zod';
-import '@ai-sdk/deepseek';
 import '@mastra/memory';
+import '@ai-sdk/openai-compatible';
 import 'fs/promises';
 import 'https';
 import 'url';

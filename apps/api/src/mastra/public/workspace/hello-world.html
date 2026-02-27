@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello World</title>
+    
+    <!-- 仅允许的外部资源 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <!-- 自定义样式 -->
+    <style>
+        /* 全局样式重置和基础设置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* 卡片容器动画效果 */
+        .card {
+            animation: fadeInUp 0.6s ease-out;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* 标题文字渐变效果 */
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* 装饰性圆点 */
+        .decorative-dot {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+        }
+        
+        /* 按钮悬停效果 */
+        .action-btn {
+            transition: all 0.3s ease;
+        }
+        
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        /* 移动端优化 */
+        @media (max-width: 640px) {
+            .card {
+                margin: 1rem;
+                padding: 2rem;
+            }
+            
+            h1 {
+                font-size: 2rem !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- 装饰性背景元素 -->
+        <div class="decorative-dot" :style="{ top: '10%', left: '10%' }"></div>
+        <div class="decorative-dot" :style="{ top: '80%', right: '15%' }"></div>
+        <div class="decorative-dot" :style="{ bottom: '10%', left: '20%' }"></div>
+        
+        <!-- 主内容卡片 -->
+        <div class="card rounded-2xl p-8 max-w-md w-full mx-4">
+            <!-- 图标区域 -->
+            <div class="flex justify-center mb-6">
+                <svg class="w-16 h-16 gradient-text" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
+                    <path d="M10 6a1 1 0 00-1 1v2a1 1 0 102 0V7a1 1 0 00-1-1zm0 4a1 1 0 00-1 1v2a1 1 0 102 0v-2a1 1 0 00-1-1z"/>
+                </svg>
+            </div>
+            
+            <!-- 主标题 -->
+            <h1 class="text-4xl font-bold text-center mb-4 gradient-text">
+                {{ message }}
+            </h1>
+            
+            <!-- 副标题 -->
+            <p class="text-gray-600 text-center mb-8">
+                欢迎来到前端开发的世界！
+            </p>
+            
+            <!-- 操作按钮 -->
+            <button 
+                @click="toggleMessage"
+                class="action-btn w-full bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold py-3 px-6 rounded-lg shadow-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+            >
+                {{ buttonText }}
+            </button>
+            
+            <!-- 版本信息 -->
+            <div class="mt-6 pt-6 border-t border-gray-200">
+                <p class="text-sm text-gray-500 text-center">
+                    Created with Vue.js 3 & TailwindCSS
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Vue.js 应用逻辑 -->
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    message: 'Hello, World!',
+                    isRevealed: false,
+                    buttonText: '点击切换消息'
+                };
+            },
+            methods: {
+                toggleMessage() {
+                    this.isRevealed = !this.isRevealed;
+                    if (this.isRevealed) {
+                        this.message = 'Welcome to the Future!';
+                        this.buttonText = '返回原始消息';
+                    } else {
+                        this.message = 'Hello, World!';
+                        this.buttonText = '点击切换消息';
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

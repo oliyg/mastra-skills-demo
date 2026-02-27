@@ -1,14 +1,14 @@
 import { scoreTraces, scoreTracesWorkflow } from '@mastra/core/evals/scoreTraces';
 import { Mastra } from '@mastra/core';
+import { Workspace, LocalSandbox, LocalFilesystem, WORKSPACE_TOOLS as WORKSPACE_TOOLS$1 } from '@mastra/core/workspace';
 import { PinoLogger } from '@mastra/loggers';
 import { LibSQLStore } from '@mastra/libsql';
 import { Observability, SensitiveDataFilter, DefaultExporter, CloudExporter } from '@mastra/observability';
-import { Workspace, LocalSandbox, LocalFilesystem, WORKSPACE_TOOLS as WORKSPACE_TOOLS$1 } from '@mastra/core/workspace';
 import { Workflow, createStep, createWorkflow } from '@mastra/core/workflows';
 import z$1, { z, ZodObject } from 'zod';
 import { Agent, MessageList, isSupportedLanguageModel, tryGenerateWithJsonFallback, tryStreamWithJsonFallback } from '@mastra/core/agent';
-import { deepseek } from '@ai-sdk/deepseek';
 import { Memory as Memory$1 } from '@mastra/memory';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { readdir, readFile, mkdtemp, rm, writeFile, mkdir, copyFile, stat } from 'fs/promises';
 import * as https from 'https';
 import { join, resolve as resolve$2, dirname, extname, basename, isAbsolute, relative } from 'path';
@@ -43,29 +43,31 @@ import { MastraServerBase } from '@mastra/core/server';
 import { Buffer as Buffer$1 } from 'buffer';
 import { tools } from './tools.mjs';
 
-const SYSTEM_PROMPT = `You are an expert frontend code generator. Your task is to create complete, standalone HTML files based on user requirements.
+const SYSTEM_PROMPT$1 = `\u4F60\u662F\u4E00\u4F4D\u4E13\u4E1A\u7684\u524D\u7AEF\u4EE3\u7801\u751F\u6210\u5668\u3002\u4F60\u7684\u4EFB\u52A1\u662F\u6839\u636E\u7528\u6237\u9700\u6C42\u521B\u5EFA\u5B8C\u6574\u7684\u72EC\u7ACB HTML \u4EE3\u7801\uFF0C\u5E76\u4EE5 json \u6570\u636E\u8F93\u51FA\u3002
 
-## Core Constraints (CRITICAL - MUST FOLLOW)
+\u91CD\u8981\uFF1A\u4F60\u53EA\u6709\u5DE5\u4F5C\u533A\u7684\u8BFB\u53D6\u6743\u9650\uFF0C\u6CA1\u6709\u5199\u5165\u6743\u9650\uFF0C\u56E0\u6B64\u4F60\u53EA\u80FD\u8FD4\u56DE\u4EE3\u7801\u5185\u5BB9\uFF0C\u4E0D\u8981\u5C1D\u8BD5\u8FDB\u884C\u6587\u4EF6\u5199\u5165\u3002
 
-1. **External Resources - ONLY THESE TWO ALLOWED:**
+## \u6838\u5FC3\u7EA6\u675F\uFF08\u5173\u952E - \u5FC5\u987B\u9075\u5B88\uFF09
+
+1. **\u5916\u90E8\u8D44\u6E90 - \u4EC5\u5141\u8BB8\u4EE5\u4E0B\u4E24\u79CD\uFF1A**
    - TailwindCSS CDN: https://cdn.tailwindcss.com
    - Vue.js CDN: https://unpkg.com/vue@3/dist/vue.global.js
 
-2. **ALL OTHER RESOURCES MUST BE INLINED:**
-   - Custom CSS \u2192 Place inside <style> tags
-   - Custom JavaScript \u2192 Place inside <script> tags
-   - Fonts \u2192 Use system fonts or inline font-face declarations with base64
-   - Icons \u2192 Use inline SVG or Unicode characters
-   - Images \u2192 Use data URIs (base64) or inline SVG
+2. **\u6240\u6709\u5176\u4ED6\u8D44\u6E90\u5FC5\u987B\u5185\u8054\uFF1A**
+   - \u81EA\u5B9A\u4E49 CSS \u2192 \u653E\u7F6E\u5728 <style> \u6807\u7B7E\u5185
+   - \u81EA\u5B9A\u4E49 JavaScript \u2192 \u653E\u7F6E\u5728 <script> \u6807\u7B7E\u5185
+   - \u5B57\u4F53 \u2192 \u4F7F\u7528\u7CFB\u7EDF\u5B57\u4F53\u6216\u4F7F\u7528 base64 \u7684\u5185\u8054 font-face \u58F0\u660E
+   - \u56FE\u6807 \u2192 \u4F7F\u7528\u5185\u8054 SVG \u6216 Unicode \u5B57\u7B26
+   - \u56FE\u7247 \u2192 \u4F7F\u7528 data URI\uFF08base64\uFF09\u6216\u5185\u8054 SVG
 
-3. **PROHIBITED:**
-   - No external CSS files via <link> (except Tailwind)
-   - No external JS files via <script src> (except Vue)
-   - No external image URLs (http/https)
-   - No Google Fonts or other font CDNs
-   - No icon libraries (FontAwesome, etc.)
+3. **\u7981\u6B62\u9879\uFF1A**
+   - \u4E0D\u901A\u8FC7 <link> \u5F15\u5165\u5916\u90E8 CSS \u6587\u4EF6\uFF08Tailwind \u9664\u5916\uFF09
+   - \u4E0D\u901A\u8FC7 <script src> \u5F15\u5165\u5916\u90E8 JS \u6587\u4EF6\uFF08Vue \u9664\u5916\uFF09
+   - \u4E0D\u4F7F\u7528\u5916\u90E8\u56FE\u7247 URL\uFF08http/https\uFF09
+   - \u4E0D\u4F7F\u7528 Google Fonts \u6216\u5176\u4ED6\u5B57\u4F53 CDN
+   - \u4E0D\u4F7F\u7528\u56FE\u6807\u5E93\uFF08FontAwesome \u7B49\uFF09
 
-## HTML Structure Template
+## HTML \u7ED3\u6784\u6A21\u677F
 
 \`\`\`html
 <!DOCTYPE html>
@@ -73,54 +75,41 @@ const SYSTEM_PROMPT = `You are an expert frontend code generator. Your task is t
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>[Page Title]</title>
-    <!-- ONLY EXTERNAL RESOURCES ALLOWED -->
+    <title>[\u9875\u9762\u6807\u9898]</title>
+    <!-- \u4EC5\u5141\u8BB8\u7684\u5916\u90E8\u8D44\u6E90 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <!-- Custom styles MUST be inline -->
+    <!-- \u81EA\u5B9A\u4E49\u6837\u5F0F\u5FC5\u987B\u5185\u8054 -->
     <style>
-        /* Your custom CSS here */
+        /* \u5728\u6B64\u653E\u7F6E\u4F60\u7684\u81EA\u5B9A\u4E49 CSS */
     </style>
 </head>
 <body>
     <div id="app">
-        <!-- Vue.js application markup -->
+        <!-- Vue.js \u5E94\u7528\u6807\u8BB0 -->
     </div>
     
-    <!-- Custom JavaScript MUST be inline -->
+    <!-- \u81EA\u5B9A\u4E49 JavaScript \u5FC5\u987B\u5185\u8054 -->
     <script>
         const { createApp } = Vue;
         createApp({
-            // Vue app configuration
+            // Vue \u5E94\u7528\u914D\u7F6E
         }).mount('#app');
     </script>
 </body>
 </html>
 \`\`\`
 
-## Input Format
+## \u8F93\u51FA\u683C\u5F0F
 
-The user will provide input in this JSON structure:
-\`\`\`json
-{
-  "requirement": "Description of what to build",
-  "options": {
-    "style": "modern" | "minimalist" | "colorful",
-    "complexity": "simple" | "medium" | "complex"
-  }
-}
-\`\`\`
-
-## Output Format
-
-You MUST respond with a JSON object in this exact structure, without any additional text or explanation:
+\u4F60\u5FC5\u987B\u4E25\u683C\u6309\u7167\u4EE5\u4E0B\u7ED3\u6784\u8FD4\u56DE JSON \u5BF9\u8C61\uFF0C\u4E0D\u5F97\u6DFB\u52A0\u4EFB\u4F55\u989D\u5916\u6587\u672C\u6216\u8BF4\u660E\uFF1A
 
 \`\`\`json
 {
   "html": "<!DOCTYPE html>...",
   "metadata": {
-    "title": "Brief title",
-    "description": "What the page does",
+    "title": "\u7B80\u77ED\u6807\u9898",
+    "description": "\u9875\u9762\u7684\u529F\u80FD\u63CF\u8FF0",
     "tailwindVersion": "3.x",
     "vueVersion": "3.x",
     "estimatedComplexity": "simple|medium|complex",
@@ -130,107 +119,153 @@ You MUST respond with a JSON object in this exact structure, without any additio
   "success": true
 }
 \`\`\`
-
-## Style Guidelines
-
-- **modern**: Clean, professional, subtle shadows, rounded corners, generous whitespace
-- **minimalist**: Maximum simplicity, monochrome or limited colors, essential elements only
-- **colorful**: Vibrant colors, gradients, playful elements, visual interest
-
-## Complexity Levels
-
-- **simple**: Single component, basic interactivity, < 100 lines
-- **medium**: Multiple components, moderate state management, 100-300 lines
-- **complex**: Rich interactions, advanced Vue features, > 300 lines
-
-## Best Practices
-
-1. Use semantic HTML elements
-2. Make components responsive with Tailwind classes
-3. Add appropriate comments in code
-4. Ensure accessibility (ARIA labels where needed)
-5. Use Vue 3 Composition API with <script setup> syntax when appropriate
-6. Validate that no prohibited external resources are included
 `;
 
-function createFrontendCodeGeneratorAgent(workspace) {
-  return new Agent({
-    id: "frontend-code-generator",
-    name: "Frontend Code Generator",
-    instructions: SYSTEM_PROMPT,
-    model: deepseek("deepseek-chat"),
-    workspace,
-    // 3.3 为只读代理应用工作空间配置
-    memory: new Memory$1({
-      options: {
-        lastMessages: 20
-      }
-    })
-  });
-}
-createFrontendCodeGeneratorAgent();
+let model;
+const getModel = () => {
+  if (model) return model;
+  model = createOpenAICompatible({
+    baseURL: process.env.MODEL_BASE_URL ?? "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    name: "openAICompatibleModel",
+    apiKey: process.env.MODEL_API_KEY ?? "NO_API_KEY_FOUND"
+  }).chatModel(process.env.MODEL_NAME ?? "NO_MODEL_NAME_FOUND");
+  return model;
+};
 
-const WORKSPACE_AGENT_PROMPT = `You are a Workspace Agent with full permissions to manage workspace files and execute code in sandbox.
-
-## Capabilities
-
-You have complete access to:
-- **Workspace Files**: Read, write, edit, delete files and create directories within the workspace
-- **Sandbox Execution**: Run code and execute commands in an isolated sandbox environment
-
-## Guidelines
-
-1. **File Operations**: Perform file operations safely within the workspace directory
-2. **Code Execution**: Execute code in the sandbox and return results
-3. **Data Flow**: Support reading files from workspace, executing in sandbox, and writing results back to workspace
-4. **Security**: Ensure all operations stay within the configured workspace boundaries
-
-## Safety
-
-- Never attempt to access files outside the workspace directory
--\u62D2\u7EDD\u6267\u884C\u5371\u9669\u547D\u4EE4 that could harm the system
-- Report any security concerns immediately
-`;
-
-const getWorkspacePath$1 = () => {
+const getWorkspacePath = () => {
   return process.env.MASTRA_WORKSPACE_PATH || "./workspace";
 };
-function createWorkspaceAgent(workspace) {
-  const agentWorkspace = workspace ?? new Workspace({
-    id: "workspace-agent-workspace",
-    name: "Workspace Agent Workspace",
-    filesystem: new LocalFilesystem({
-      basePath: getWorkspacePath$1(),
-      contained: true
-    }),
-    sandbox: new LocalSandbox({
-      workingDirectory: getWorkspacePath$1()
-    }),
-    tools: {
-      [WORKSPACE_TOOLS$1.FILESYSTEM.READ_FILE]: { enabled: true },
-      [WORKSPACE_TOOLS$1.FILESYSTEM.WRITE_FILE]: { enabled: true },
-      [WORKSPACE_TOOLS$1.FILESYSTEM.EDIT_FILE]: { enabled: true },
-      [WORKSPACE_TOOLS$1.FILESYSTEM.DELETE]: { enabled: true },
-      [WORKSPACE_TOOLS$1.FILESYSTEM.MKDIR]: { enabled: true },
-      [WORKSPACE_TOOLS$1.FILESYSTEM.LIST_FILES]: { enabled: true },
-      [WORKSPACE_TOOLS$1.FILESYSTEM.FILE_STAT]: { enabled: true },
-      [WORKSPACE_TOOLS$1.SANDBOX.EXECUTE_COMMAND]: { enabled: true }
-    }
-  });
-  return new Agent({
-    id: "workspace-agent",
-    name: "Workspace Agent",
-    instructions: WORKSPACE_AGENT_PROMPT,
-    model: deepseek("deepseek-chat"),
-    workspace: agentWorkspace,
+let workspaceInstance = null;
+let readOnlyWorkspaceInstance = null;
+const createWorkspace = () => {
+  if (!workspaceInstance) {
+    const workspacePath = getWorkspacePath();
+    workspaceInstance = new Workspace({
+      id: "mastra-workspace",
+      name: "Mastra Workspace",
+      filesystem: new LocalFilesystem({
+        basePath: workspacePath,
+        contained: true
+      }),
+      sandbox: new LocalSandbox({
+        workingDirectory: workspacePath
+      })
+    });
+  }
+  return workspaceInstance;
+};
+const createReadOnlyWorkspace = () => {
+  if (!readOnlyWorkspaceInstance) {
+    const workspacePath = getWorkspacePath();
+    readOnlyWorkspaceInstance = new Workspace({
+      id: "mastra-readonly-workspace",
+      name: "Mastra ReadOnly Workspace",
+      filesystem: new LocalFilesystem({
+        basePath: workspacePath,
+        contained: true
+      }),
+      // skills: ["./skills"],
+      tools: {
+        [WORKSPACE_TOOLS$1.FILESYSTEM.WRITE_FILE]: { enabled: false },
+        [WORKSPACE_TOOLS$1.FILESYSTEM.EDIT_FILE]: { enabled: false },
+        [WORKSPACE_TOOLS$1.FILESYSTEM.DELETE]: { enabled: false },
+        [WORKSPACE_TOOLS$1.FILESYSTEM.MKDIR]: { enabled: false }
+      }
+    });
+  }
+  return readOnlyWorkspaceInstance;
+};
+const initWorkspaces = async () => {
+  await createWorkspace().init();
+  await createReadOnlyWorkspace().init();
+};
+const workspace = createWorkspace();
+const readOnlyWorkspace = createReadOnlyWorkspace();
+
+let frontendCoderAgent$1;
+function getFrontendCoderAgent() {
+  if (frontendCoderAgent$1) return frontendCoderAgent$1;
+  frontendCoderAgent$1 = new Agent({
+    id: "frontend-coder",
+    name: "Frontend Coder",
+    instructions: SYSTEM_PROMPT$1,
+    model: getModel(),
+    workspace: readOnlyWorkspace,
     memory: new Memory$1({
       options: {
         lastMessages: 20
       }
     })
   });
+  return frontendCoderAgent$1;
 }
-createWorkspaceAgent();
+
+const WORKSPACE_AGENT_PROMPT = `\u4F60\u662F\u4E00\u4E2A\u5DE5\u4F5C\u533A\u4EE3\u7406\uFF0C\u62E5\u6709\u5B8C\u5168\u6743\u9650\u6765\u7BA1\u7406\u5DE5\u4F5C\u533A\u6587\u4EF6\u5E76\u5728\u6C99\u7BB1\u4E2D\u6267\u884C\u4EE3\u7801\u3002
+
+## \u80FD\u529B
+
+\u4F60\u62E5\u6709\u5B8C\u5168\u7684\u8BBF\u95EE\u6743\u9650\uFF1A
+- **\u5DE5\u4F5C\u533A\u6587\u4EF6**\uFF1A\u5728\u5DE5\u4F5C\u533A\u5185\u8BFB\u53D6\u3001\u5199\u5165\u3001\u7F16\u8F91\u3001\u5220\u9664\u6587\u4EF6\u548C\u521B\u5EFA\u76EE\u5F55
+- **\u6C99\u7BB1\u6267\u884C**\uFF1A\u5728\u9694\u79BB\u7684\u6C99\u7BB1\u73AF\u5883\u4E2D\u8FD0\u884C\u4EE3\u7801\u548C\u6267\u884C\u547D\u4EE4
+
+## \u6307\u5357
+
+1. **\u6587\u4EF6\u64CD\u4F5C**\uFF1A\u5728\u5DE5\u4F5C\u533A\u76EE\u5F55\u5185\u5B89\u5168\u5730\u6267\u884C\u6587\u4EF6\u64CD\u4F5C
+2. **\u4EE3\u7801\u6267\u884C**\uFF1A\u5728\u6C99\u7BB1\u4E2D\u6267\u884C\u4EE3\u7801\u5E76\u8FD4\u56DE\u7ED3\u679C
+3. **\u6570\u636E\u6D41**\uFF1A\u652F\u6301\u4ECE\u5DE5\u4F5C\u533A\u8BFB\u53D6\u6587\u4EF6\u3001\u5728\u6C99\u7BB1\u4E2D\u6267\u884C\u3001\u5E76\u5C06\u7ED3\u679C\u5199\u56DE\u5DE5\u4F5C\u533A
+4. **\u5B89\u5168\u6027**\uFF1A\u786E\u4FDD\u6240\u6709\u64CD\u4F5C\u90FD\u5728\u914D\u7F6E\u7684\u5DE5\u4F5C\u533A\u8FB9\u754C\u5185\u8FDB\u884C
+
+## \u5B89\u5168
+
+- \u7EDD\u4E0D\u5C1D\u8BD5\u8BBF\u95EE\u5DE5\u4F5C\u533A\u76EE\u5F55\u4E4B\u5916\u7684\u6587\u4EF6
+- \u62D2\u7EDD\u6267\u884C\u53EF\u80FD\u5371\u5BB3\u7CFB\u7EDF\u7684\u5371\u9669\u547D\u4EE4
+- \u7ACB\u5373\u62A5\u544A\u4EFB\u4F55\u5B89\u5168\u95EE\u9898
+`;
+
+let workspaceOperator$1;
+function getWorkspaceOperator() {
+  if (workspaceOperator$1) return workspaceOperator$1;
+  workspaceOperator$1 = new Agent({
+    id: "workspace-operator",
+    name: "Workspace Operator",
+    instructions: WORKSPACE_AGENT_PROMPT,
+    model: getModel(),
+    workspace,
+    memory: new Memory$1({
+      options: {
+        lastMessages: 20
+      }
+    })
+  });
+  return workspaceOperator$1;
+}
+
+const SYSTEM_PROMPT = `\u4F60\u662F\u4E00\u4E2A\u4E13\u4E1A\u7684\u524D\u7AEF\u5F00\u53D1\u5DE5\u7A0B\u5E08\uFF0C\u4E13\u95E8\u8D1F\u8D23\u521B\u5EFA\u9AD8\u8D28\u91CF\u7684 HTML \u9875\u9762\u3002
+
+## \u4F60\u7684\u4E3B\u8981\u4EFB\u52A1
+1. \u6839\u636E\u7528\u6237\u7684\u9700\u6C42\u8C03\u7528 frontendCoderAgent \u521B\u5EFA\u524D\u7AEF HTML \u9875\u9762
+2. \u5C06\u751F\u6210\u7684 HTML \u9875\u9762\u901A\u8FC7 workspaceOperator \u5199\u5165\u5230\u5DE5\u4F5C\u533A\u6587\u4EF6\u5939\u5185
+`;
+let frontendDevelopNetworkAgent$1;
+function getFrontendDevelopNetworkAgent() {
+  if (frontendDevelopNetworkAgent$1) return frontendDevelopNetworkAgent$1;
+  frontendDevelopNetworkAgent$1 = new Agent({
+    id: "frontend-develop-network",
+    name: "Frontend Develop Network",
+    instructions: SYSTEM_PROMPT,
+    model: getModel(),
+    memory: new Memory$1({
+      options: {
+        lastMessages: 20
+      }
+    }),
+    agents: {
+      frontendCoderAgent: getFrontendCoderAgent(),
+      workspaceOperator: getWorkspaceOperator()
+    }
+  });
+  return frontendDevelopNetworkAgent$1;
+}
 
 const generateFrontendCodeSchema = z.object({
   html: z.string(),
@@ -331,55 +366,15 @@ const simpleWorkflow = new Workflow({
   })
 }).then(stepOne).then(stepTwo).then(stepThree);
 
-const getWorkspacePath = () => {
-  return process.env.MASTRA_WORKSPACE_PATH || "./workspace";
-};
-const workspacePath = getWorkspacePath();
-const globalWorkspace = new Workspace({
-  id: "mastra-global-workspace",
-  name: "Mastra Global Workspace",
-  filesystem: new LocalFilesystem({
-    basePath: workspacePath,
-    contained: true
-    // 1.5 确保工作空间只能访问其目录内的文件
-  }),
-  // skills: ['./skills'], // 可根据需要添加全局技能
-  sandbox: new LocalSandbox({
-    workingDirectory: workspacePath
-  })
-});
-const readOnlyWorkspace = new Workspace({
-  id: "mastra-readonly-workspace",
-  name: "Mastra ReadOnly Workspace",
-  filesystem: new LocalFilesystem({
-    basePath: workspacePath,
-    contained: true
-  }),
-  // skills: ['./skills'], // 可根据需要添加全局技能
-  tools: {
-    // 禁用写入相关工具
-    [WORKSPACE_TOOLS$1.FILESYSTEM.WRITE_FILE]: {
-      enabled: false
-    },
-    [WORKSPACE_TOOLS$1.FILESYSTEM.EDIT_FILE]: {
-      enabled: false
-    },
-    [WORKSPACE_TOOLS$1.FILESYSTEM.DELETE]: {
-      enabled: false
-    },
-    [WORKSPACE_TOOLS$1.FILESYSTEM.MKDIR]: {
-      enabled: false
-    }
-  }
-});
-await globalWorkspace.init();
-await readOnlyWorkspace.init();
-const frontendCodeGeneratorAgent = createFrontendCodeGeneratorAgent(readOnlyWorkspace);
-const workspaceAgent = createWorkspaceAgent(globalWorkspace);
+const frontendCoderAgent = getFrontendCoderAgent();
+const workspaceOperator = getWorkspaceOperator();
+const frontendDevelopNetworkAgent = getFrontendDevelopNetworkAgent();
+initWorkspaces();
 const mastra = new Mastra({
   agents: {
-    frontendCodeGenerator: frontendCodeGeneratorAgent,
-    workspace: workspaceAgent
+    frontendCoder: frontendCoderAgent,
+    workspaceOperator,
+    frontendDevelopNetwork: frontendDevelopNetworkAgent
   },
   workflows: {
     simple: simpleWorkflow
@@ -409,9 +404,7 @@ const mastra = new Mastra({
         ]
       }
     }
-  }),
-  workspace: globalWorkspace
-  // 2.1 在 Mastra 配置中添加 workspace 选项
+  })
 });
 
 function normalizeStudioBase(studioBase) {

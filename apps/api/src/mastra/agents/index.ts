@@ -1,5 +1,3 @@
-export {
-  frontendCodeGeneratorAgent,
-  createFrontendCodeGeneratorAgent,
-} from './frontend-code-generator/index.js';
-export { workspaceAgent, createWorkspaceAgent } from './workspace-agent/index.js';
+export { getFrontendCoderAgent } from './frontend-coder/index.js';
+export { getWorkspaceOperator } from './workspace-operator/index.js';
+export { getFrontendDevelopNetworkAgent } from './frontend-develop-network/index.js';
